@@ -59,7 +59,7 @@ function Home(){
 function App() {
   return (
    <Routes>
-    <Route path="/" element={<Home />}/>
+    <Route path="/Chattery" element={<Home />}/>
     <Route path="/chatmain" element={<ChatMain />}/>
    </Routes>
   );
