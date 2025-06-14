@@ -28,7 +28,9 @@ function Home(){
 
     registerOnlineUser(nickname.trim());
 
-    navigate("/ChatMain", { state: {nickname}});
+    navigate("/ChatMain", { 
+      state: {nickname, roomId: "kim123_lee456" }
+    });
   }
 
   // 커스텀 훅으로 접속 상태 등록

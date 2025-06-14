@@ -1,24 +1,59 @@
-import React, { useState } from "react";
-import '../ChatMain.css';
+import React, { useState, useEffect } from "react";
+import { getDatabase, ref, push, onChildAdded ,onValue, onDisconnect, remove} from "firebase/database";
+import { useLocation } from "react-router-dom";
+import "../ChatMain.css";
 
+function ChatMain() {
+  const location = useLocation();
+  const { nickname = "익명", roomId = "default_room" } = location.state || {};
 
-function GoChatMain() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
 
-  const handleSend = () => {
-    if (message.trim() === "") return;  // 빈 메시지 무시
+  useEffect(() => {
+    const db = getDatabase();
+    const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
 
-    setMessages([...messages, message]);
-    setMessage("");  // 입력창 초기화
+    // 실시간 메시지 추가 감지
+    onValue(messagesRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      const messagesList = Object.values(data);
+      setMessages(messagesList);
+    }
+  });
+    const roomRef = ref(db, `chat/rooms/${roomId}`);
+    onDisconnect(roomRef).remove();
+
+    return () => {
+      remove(roomRef);
+    };
+  }, [roomId]);
+
+  const handleSend = () => {
+    if (message.trim() === "") return;
+
+    const db = getDatabase();
+    const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
+
+    push(messagesRef, {
+      sender: nickname,
+      text: message,
+      timestamp: Date.now(),
+    });
+
+    setMessage("");
   };
 
   return (
     <div className="Chat-Main-Container">
-      <div className="Chat-Show-Container" style={{ border: "1px solid #ccc", height: "300px", overflowY: "auto", padding: "10px" }}>
+      <div
+        className="Chat-Show-Container"
+        style={{ border: "1px solid #ccc", height: "300px", overflowY: "auto", padding: "10px" }}
+      >
         {messages.map((msg, idx) => (
           <div key={idx} style={{ marginBottom: "5px" }}>
-            {msg}
+            <strong>{msg.sender}:</strong> {msg.text}
           </div>
         ))}
       </div>
@@ -28,7 +63,9 @@ function GoChatMain() {
           autoComplete="off"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => { if(e.key === 'Enter') handleSend(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSend();
+          }}
           style={{ width: "70%", marginRight: "10px" }}
         />
         <button onClick={handleSend}>입력</button>
@@ -37,4 +74,4 @@ function GoChatMain() {
   );
 }
 
-export default GoChatMain;
+export default ChatMain;
