@@ -35,7 +35,8 @@ function ChatMain() {
     if (message.trim() === "") return;
 
     const db = getDatabase();
-    const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
+    const messagesRef = ref(db, `chatRooms/${roomId}`);
+
     const snapshot = await get(messagesRef);
 
     if (!snapshot.exists()) {
