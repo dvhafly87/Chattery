@@ -21,7 +21,7 @@ export default async function findOrCreateRoom(sessionId, nickname) {
       // 해당 방을 삭제하고 chatRooms로 이동
       await remove(ref(db, `waitingRooms/${roomId}`));
 
-      await set(ref(db, `chatRooms/${roomId}`), {
+      await set(ref(db, `chat/rooms/${roomId}`), {
         users: {
           [availableRoom[1].userId]: { nickname: availableRoom[1].nickname },
           [sessionId]: { nickname }
