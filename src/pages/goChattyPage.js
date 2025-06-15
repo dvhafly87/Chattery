@@ -35,14 +35,19 @@ function ChatMain() {
     if (message.trim() === "") return;
 
     const db = getDatabase();
+    
+     const usersRef = ref(db, `chat/rooms/${roomId}/users`);
+      const snapshot = await get(usersRef);
+
+      const users = snapshot.val();
+      const userCount = users ? Object.keys(users).length : 0;
+
+      if (userCount < 2) {
+        alert("아직 상대가 연결되지 않았습니다. 기다려 주세요!");
+        return;
+      }
+    
     const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
-    const snapshot = await get(messagesRef);
-
-    if (!snapshot.exists()) {
-      alert("아직 상대가 연결되지 않았습니다. 기다려 주세요!");
-      return;
-    }
-
     push(messagesRef, {
       sender: nickname,
       text: message,
