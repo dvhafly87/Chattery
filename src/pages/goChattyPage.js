@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getDatabase, ref, push, onChildAdded, get, onValue, onDisconnect, remove} from "firebase/database";
+import { getDatabase, ref, push, onChildAdded ,onValue, get, onDisconnect, remove} from "firebase/database";
 import { useLocation } from "react-router-dom";
 import "../ChatMain.css";
 
@@ -35,8 +35,7 @@ function ChatMain() {
     if (message.trim() === "") return;
 
     const db = getDatabase();
-    const messagesRef = ref(db, `chatRooms/${roomId}`);
-
+    const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
     const snapshot = await get(messagesRef);
 
     if (!snapshot.exists()) {
