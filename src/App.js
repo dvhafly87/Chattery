@@ -6,6 +6,7 @@ import useSetOnlineStatus from './hooks/useSetOnlineStatus';
 import useOnlineCount from './hooks/useOnlineCount';
 import ChatMain from "./pages/goChattyPage";
 import registerOnlineUser from './pages/registerOnlineUser';
+import findOrCreateRoom from './pages/findOrCreateRoom.js';
 
 function Home(){
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ function Home(){
   }
   const [nickname, setNickname] = useState("");
 
-  const goChatmainpage = () => {
+  const goChatmainpage = async () => {
 
     if (nickname.trim() === "") {
       alert("닉네임을 입력해주세요!");
@@ -28,8 +29,10 @@ function Home(){
 
     registerOnlineUser(nickname.trim());
 
+    const roomId = await findOrCreateRoom(sessionId, nickname.trim());
+
     navigate("/ChatMain", { 
-      state: {nickname, roomId: "kim123_lee456" }
+       state: { nickname, roomId }
     });
   }
 

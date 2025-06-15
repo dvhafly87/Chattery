@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getDatabase, ref, push, onChildAdded ,onValue, onDisconnect, remove} from "firebase/database";
+import { getDatabase, ref, push, onChildAdded, get, onValue, onDisconnect, remove} from "firebase/database";
 import { useLocation } from "react-router-dom";
 import "../ChatMain.css";
 
@@ -22,6 +22,7 @@ function ChatMain() {
       setMessages(messagesList);
     }
   });
+  //삭제 프로세스
     const roomRef = ref(db, `chat/rooms/${roomId}`);
     onDisconnect(roomRef).remove();
 
@@ -30,11 +31,17 @@ function ChatMain() {
     };
   }, [roomId]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (message.trim() === "") return;
 
     const db = getDatabase();
     const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
+    const snapshot = await get(messagesRef);
+
+    if (!snapshot.exists()) {
+      alert("아직 상대가 연결되지 않았습니다. 기다려 주세요!");
+      return;
+    }
 
     push(messagesRef, {
       sender: nickname,
