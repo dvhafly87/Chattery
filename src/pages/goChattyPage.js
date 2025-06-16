@@ -17,7 +17,15 @@ function ChatMain() {
   const db = getDatabase();
   const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
 
-  // 실시간 메시지 리스닝
+  // ✅ 입장 메시지 푸시
+  const enterMessage = {
+    sender: "SYSTEM",
+    text: `${nickname}님이 입장하셨습니다.`,
+    timestamp: Date.now(),
+  };
+  push(messagesRef, enterMessage);
+
+  // ✅ 메시지 실시간 수신
   onValue(messagesRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -26,15 +34,15 @@ function ChatMain() {
     }
   });
 
-  // 연결 종료 시 방 자동 삭제
+  // ✅ 연결 끊기면 방 삭제
   const roomRef = ref(db, `chat/rooms/${roomId}`);
   onDisconnect(roomRef).remove();
 
   return () => {
-    // 언마운트 시 수동 제거
-    remove(roomRef);
+    remove(roomRef); // 수동 제거
   };
-}, [roomId]);
+}, [roomId, nickname]); // nickname도 의존성에 포함
+
 
 
   const OutRoom = () => {
