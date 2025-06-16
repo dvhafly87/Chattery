@@ -35,7 +35,7 @@
   word-break: break-word;
 }
 
-input {
+.chatMessageInput{
   width: 75%;
   padding: 10px 15px;
   font-size: 16px;
@@ -45,12 +45,12 @@ input {
   transition: border-color 0.3s ease;
 }
 
-input:focus {
+.chatMessageInput:focus {
   border-color: #1a6ed8;
   box-shadow: 0 0 5px rgba(26, 110, 216, 0.5);
 }
 
-button {
+.chatMessageButton {
   width: 20%;
   padding: 10px 0;
   font-size: 16px;
@@ -63,6 +63,6 @@ button {
   transition: background-color 0.3s ease;
 }
 
-button:hover {
+.chatMessageButton:hover {
   background-color: #1a6ed8;
 }
