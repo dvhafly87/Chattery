@@ -44,7 +44,7 @@ function ChatMain() {
 }, [roomId, nickname]); // nickname도 의존성에 포함
 
 
-
+  //세션 종료
   const OutRoom = () => {
     if (window.confirm("정말로 채팅방에서 나가시겠습니까? 모든 데이터가 삭제됩니다.")) {
       const db = getDatabase();
@@ -60,7 +60,8 @@ function ChatMain() {
         });
     }
   };
-  
+
+  //세션 메시지 푸시 + 채팅 조건 
   const handleSend = async () => {
     if (message.trim() === "") return;
 
