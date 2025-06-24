@@ -138,6 +138,7 @@ function ChatMain() {
       const db = getDatabase();
       const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
       const roomRef = ref(db, `chat/rooms/${roomId}`);
+      remove(ref(db, `onlineUsers`));
 
       try {
         // 퇴장 메시지 먼저 전송
