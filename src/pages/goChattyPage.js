@@ -183,7 +183,6 @@ function ChatMain() {
       const userCount = users ? Object.keys(users).length : 0;
 
       if (userCount < 2) {
-        alert(snapshot);
         alert("아직 상대가 연결되지 않았습니다. 기다려 주세요!");
         return;
       }
