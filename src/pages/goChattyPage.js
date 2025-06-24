@@ -169,7 +169,7 @@ function ChatMain() {
     if (message.trim() === "") return;
 
     const db = getDatabase();
-    const onlineUsersRef = ref(db, `chat/rooms/${roomId}/onlineUsers`);
+    const onlineUsersRef = ref(db, `chat/rooms/${roomId}/users`);
 
     try {
       const snapshot = await get(onlineUsersRef);
