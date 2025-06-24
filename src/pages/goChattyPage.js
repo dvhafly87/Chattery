@@ -44,6 +44,9 @@ function ChatMain() {
           };
           await push(messagesRef, enterMessage);
         }
+
+
+
       } catch (error) {
         console.error("입장 메시지 처리 실패:", error);
       }
@@ -101,16 +104,17 @@ function ChatMain() {
       if (!snapshot.exists() && !roomDeleted) {
         // 방이 삭제되었고, 자신이 삭제한 것이 아니라면
         alert("상대방이 채팅방을 나갔습니다. 채팅이 종료됩니다.");
+        remove(ref(db, `onlineUsers/${userKey}`));
         navigate("/Chattery");
       }
     });
 
     // ✅ 연결이 끊어지면 해당 사용자를 onlineUsers에서 제거
-    onDisconnect(ref(db, `chat/rooms/${roomId}/onlineUsers/${userKey}`)).remove();
+    onDisconnect(ref(db, `chat/rooms/${roomId}/users/${userKey}`)).remove();
 
     // ✅ 브라우저 종료/새로고침 시에도 정리
     const handleBeforeUnload = () => {
-      remove(ref(db, `chat/rooms/${roomId}/onlineUsers/${userKey}`));
+      remove(ref(db, `chat`));
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -122,6 +126,7 @@ function ChatMain() {
 
       // 사용자 제거
       remove(ref(db, `chat/rooms/${roomId}/onlineUsers/${userKey}`));
+      remove(ref(db, `onlineUsers/${userKey}`));
     };
   }, [roomId, nickname, navigate, roomDeleted]);
 
@@ -177,6 +182,7 @@ function ChatMain() {
       const userCount = users ? Object.keys(users).length : 0;
 
       if (userCount < 2) {
+        alert(snapshot);
         alert("아직 상대가 연결되지 않았습니다. 기다려 주세요!");
         return;
       }
