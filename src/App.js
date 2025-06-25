@@ -1,17 +1,18 @@
-import React, {useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { getDatabase, ref, onvalue, onDisconnect, set } from "firebase/database";
 import { auth, apiKey } from "./firebase/firebase";
-import { BrowserRouter,Routes, Route, useNavigate } from "react-router-dom"; 
+import { Routes, Route, useNavigate } from "react-router-dom";
 import useSetOnlineStatus from './hooks/useSetOnlineStatus';
 import useOnlineCount from './hooks/useOnlineCount';
 import ChatMain from "./pages/goChattyPage";
+import Ollama3 from "./pages/chatWithLlama3";
 import registerOnlineUser from './pages/registerOnlineUser';
 import findOrCreateRoom from './pages/findOrCreateRoom.js';
 
-function Home(){
+function Home() {
   const navigate = useNavigate();
   useSetOnlineStatus();
-  
+
   const onlineCount = useOnlineCount();
   let sessionId = localStorage.getItem('sessionId');
   if (!sessionId) {
@@ -31,14 +32,27 @@ function Home(){
 
     const roomId = await findOrCreateRoom(sessionId, nickname.trim());
 
-    navigate("/ChatMain", { 
-       state: { nickname, roomId }
+    navigate("/ChatMain", {
+      state: { nickname, roomId }
     });
   }
 
+  const goChatllama3 = async () => {
+    if (nickname.trim() === "") {
+      alert("닉네임을 입력해주세요!");
+      return;
+    }
+    registerOnlineUser(nickname.trim());
+
+    const roomId = await findOrCreateRoom(sessionId, nickname.trim());
+
+    navigate("/Ollama3", {
+      state: { nickname, roomId }
+    });
+  }
   // 커스텀 훅으로 접속 상태 등록
   useSetOnlineStatus(sessionId);
-    
+
   return (
     <div className="Main-Container">
       <div>
@@ -56,6 +70,7 @@ function Home(){
           onChange={(e) => setNickname(e.target.value)}
         />
         <button className="ChatStart" onClick={goChatmainpage}>시작</button>
+        <button className="ChatStart llm3btn" onClick={goChatllama3}>llama3</button>
       </div>
     </div>
   );
@@ -63,10 +78,11 @@ function Home(){
 
 function App() {
   return (
-   <Routes>
-    <Route path="/Chattery" element={<Home />}/>
-    <Route path="/chatmain" element={<ChatMain />}/>
-   </Routes>
+    <Routes>
+      <Route path="/Chattery" element={<Home />} />
+      <Route path="/chatmain" element={<ChatMain />} />
+      <Route path="/Ollama3" element={<Ollama3 />} />
+    </Routes>
   );
 }
 

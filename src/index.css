@@ -1,3 +1,4 @@
+/*---------------App.js-----------------*/
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -6,6 +7,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
 .Main-Container {
   min-height: 100vh;
   display: flex;
@@ -33,7 +35,7 @@ body {
   max-width: 400px;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(44,62,80,0.08);
+  box-shadow: 0 4px 24px rgba(44, 62, 80, 0.08);
   padding: 32px 24px;
 }
 
@@ -65,7 +67,29 @@ body {
 .ChatStart:hover {
   background: linear-gradient(90deg, #38b2ac 0%, #4f8cff 100%);
 }
-/*---------채팅방 메인 페이지----------*/
+
+/* 반응형 미디어 쿼리 */
+@media (max-width: 600px) {
+  .Page-Title {
+    font-size: 2rem;
+    margin-bottom: 24px;
+  }
+
+  .ProcessEnter-Container {
+    padding: 20px 10px;
+    max-width: 95vw;
+  }
+
+  .NickNameInput,
+  .ChatStart {
+    font-size: 1rem;
+    padding: 12px;
+  }
+}
+
+/*---------------App.js-----------------*/
+
+/*---------goChattyPaage.js----------*/
 .Chat-Main-Container {
   max-width: 600px;
   margin: 30px auto;
@@ -92,7 +116,7 @@ body {
   color: #333;
 }
 
-.Chat-Show-Container > div {
+.Chat-Show-Container>div {
   padding: 8px 12px;
   background-color: #e1f0ff;
   border-radius: 20px;
@@ -101,7 +125,7 @@ body {
   word-break: break-word;
 }
 
-.chatMessageInput{
+.chatMessageInput {
   width: 75%;
   padding: 10px 15px;
   font-size: 16px;
@@ -134,26 +158,21 @@ body {
 }
 
 .Chat-Exit-Button {
-  margin-top:5px;
-  width:100%;
-  height:25px;
+  margin-top: 5px;
+  width: 100%;
+  height: 25px;
 }
 
 /*------------------------*/
 
-/* 반응형 미디어 쿼리 */
-@media (max-width: 600px) {
-  .Page-Title {
-    font-size: 2rem;
-    margin-bottom: 24px;
-  }
-  .ProcessEnter-Container {
-    padding: 20px 10px;
-    max-width: 95vw;
-  }
-  .NickNameInput,
-  .ChatStart {
-    font-size: 1rem;
-    padding: 12px;
-  }
+
+/*-------chatWithLlma3.js--------*/
+.Main-llm3-Container {
+  min-height: 100vh;
+  width: auto;
+  background-color: #BEBEBE;
+  display: flex;
+  flex-direction: column;
 }
+
+/*-------chatWithLlma3.js--------*/

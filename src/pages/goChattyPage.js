@@ -220,7 +220,7 @@ function ChatMain() {
       <div>
         <input
           className="chatMessageInput"
-          placeholder="메시지 입력"
+          placeholder="메시지 입력..."
           autoComplete="off"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
