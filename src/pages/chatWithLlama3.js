@@ -98,13 +98,13 @@ function ChatWithLlama3() {
             });
 
         } catch (error) {
-            alert(error);
             console.error("API 요청 실패:", error);
             setMessages(prev => [...prev, {
                 type: 'error',
                 content: '메시지 전송에 실패했습니다. 네트워크 연결을 확인해주세요.',
                 timestamp: new Date()
             }]);
+            alert(error);
         } finally {
             setIsLoading(false);
         }
