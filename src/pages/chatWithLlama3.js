@@ -98,6 +98,7 @@ function ChatWithLlama3() {
             });
 
         } catch (error) {
+            alert(error);
             console.error("API 요청 실패:", error);
             setMessages(prev => [...prev, {
                 type: 'error',
