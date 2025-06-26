@@ -32,6 +32,7 @@ function ChatWithLlama3() {
         try {
             const res = await fetch("https://3ec2-122-32-218-57.ngrok-free.app/api/generate", {
                 method: "POST",
+                mode: 'cors',
                 headers: {
                     "Content-Type": "application/json"
                 },
