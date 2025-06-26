@@ -30,7 +30,7 @@ function ChatWithLlama3() {
         setIsLoading(true);
 
         try {
-            const res = await fetch("https://3ec2-122-32-218-57.ngrok-free.app/api/generate", {
+            const res = await fetch("https://dvhafly87.kmgproj.p-e.kr:3339/api/generate", {
                 method: "POST",
                 mode: 'cors',
                 headers: {
