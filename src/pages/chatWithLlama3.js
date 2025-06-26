@@ -105,7 +105,7 @@ function ChatWithLlama3() {
                 content: '메시지 전송에 실패했습니다. 네트워크 연결을 확인해주세요.',
                 timestamp: new Date()
             }]);
-            alert(error);
+            alert(JSON.stringify(error, Object.getOwnPropertyNames(error)));
         } finally {
             setIsLoading(false);
         }
