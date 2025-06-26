@@ -30,7 +30,7 @@ function ChatWithLlama3() {
         setIsLoading(true);
 
         try {
-            const res = await fetch("https://dvhafly87.kmgproj.p-e.kr:3339/api/generate", {
+            const res = await fetch("http://122.32.218.57:11434/api/generate", {
                 method: "POST",
                 mode: 'cors',
                 headers: {
