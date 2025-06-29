@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
+import { getDatabase, ref, remove, push } from "firebase/database";
+import { auth, apiKey } from "../firebase/firebase";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 
 function ChatWithLlama3() {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    //유저 정보/방 정보
+    const { nickname, roomId } = location.state || {};
+
     const [userInput, setUserInput] = useState("");
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isTranslationEnabled, setIsTranslationEnabled] = useState(true);
     const chatMessagesRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -13,6 +23,35 @@ function ChatWithLlama3() {
             chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
         }
     }, [messages]);
+
+    const OutRoom = async () => {
+        if (window.confirm("나가시겠습니까?")) {
+
+            const db = getDatabase();
+            const AiRef = ref(db, `waitingRooms/${roomId}`)
+            const AiUse = ref(db, `onlineUsers/${nickname}`)
+
+            try {
+                // AI 세션 삭제 프로세스
+                setTimeout(async () => {
+                    try {
+                        await remove(AiRef);
+                        await remove(AiUse);
+
+                        console.log("채팅방이 삭제되었습니다.");
+
+                        navigate("/Chattery");
+                    } catch (error) {
+                        console.error("채팅방 삭제 중 오류 발생:", error);
+                        alert("삭제 실패. 콘솔을 확인하세요.");
+                    }
+                }, 1500); // 1.5초 후 삭제
+
+            } catch (error) {
+                console.error("퇴장 메시지 전송 실패:", error);
+            }
+        }
+    };
 
     const messageSend = async () => {
         if (!userInput.trim()) return;
@@ -59,9 +98,68 @@ function ChatWithLlama3() {
                 isStreaming: true
             }]);
 
+            async function translateText(text) {
+                const apiKey = "AIzaSyDnBk4zgG-J7tklh63ZvdghkHJQB98Okv8";
+
+                // 문단 구분을 위해 줄바꿈을 특별한 마커로 대체
+                const textWithMarkers = text
+                    .replace(/\n\n/g, ' [PARAGRAPH_BREAK] ')
+                    .replace(/\n/g, ' [LINE_BREAK] ');
+
+                const url = `https://translation.googleapis.com/language/translate/v2?q=${encodeURIComponent(textWithMarkers)}&target=ko&key=${apiKey}`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+                let translatedText = data.data.translations[0].translatedText;
+
+                // HTML 엔티티 디코딩
+                translatedText = translatedText
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'")
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&nbsp;/g, ' ');
+
+                // 마커를 다시 줄바꿈으로 복원
+                translatedText = translatedText
+                    .replace(/\[PARAGRAPH_BREAK\]/g, '\n\n')
+                    .replace(/\[LINE_BREAK\]/g, '\n');
+
+                return translatedText;
+            }
+
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+
+                if (done) {
+                    let finalResponse = fullResponse;
+
+                    // 원문과 번역문을 모두 저장
+                    let translatedResponse = fullResponse;
+                    if (isTranslationEnabled) {
+                        try {
+                            translatedResponse = await translateText(fullResponse);
+                        } catch (error) {
+                            console.error("번역 실패:", error);
+                            // 번역 실패 시 원본 텍스트 유지
+                        }
+                    }
+
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        newMessages[aiMessageIndex] = {
+                            ...newMessages[aiMessageIndex],
+                            originalContent: fullResponse, // 원문 저장
+                            translatedContent: translatedResponse, // 번역문 저장
+                            content: isTranslationEnabled ? translatedResponse : fullResponse, // 현재 표시할 내용
+                            isStreaming: false
+                        };
+                        return newMessages;
+                    });
+
+                    break;
+                }
 
                 const chunk = decoder.decode(value);
                 const lines = chunk.split("\n").filter(line => line.trim() !== "");
@@ -69,10 +167,10 @@ function ChatWithLlama3() {
                 for (const line of lines) {
                     try {
                         const json = JSON.parse(line);
+
                         if (json.response) {
                             fullResponse += json.response;
-
-                            // 실시간으로 AI 응답 업데이트
+                            // 실시간으로 AI 응답 표시 (번역 전 원본)
                             setMessages(prev => {
                                 const newMessages = [...prev];
                                 newMessages[aiMessageIndex] = {
@@ -88,16 +186,6 @@ function ChatWithLlama3() {
                 }
             }
 
-            // 스트리밍 완료
-            setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[aiMessageIndex] = {
-                    ...newMessages[aiMessageIndex],
-                    isStreaming: false
-                };
-                return newMessages;
-            });
-
         } catch (error) {
             console.error("API 요청 실패:", error);
             setMessages(prev => [...prev, {
@@ -105,7 +193,6 @@ function ChatWithLlama3() {
                 content: '메시지 전송에 실패했습니다. 네트워크 연결을 확인해주세요.',
                 timestamp: new Date()
             }]);
-            alert(JSON.stringify(error, Object.getOwnPropertyNames(error)));
         } finally {
             setIsLoading(false);
         }
@@ -125,307 +212,43 @@ function ChatWithLlama3() {
         });
     };
 
+    const toggleTranslation = () => {
+        setIsTranslationEnabled(!isTranslationEnabled);
+
+        // 기존 AI 메시지들의 표시 내용을 토글 상태에 따라 업데이트
+        setMessages(prev => prev.map(message => {
+            if (message.type === 'ai' && message.originalContent) {
+                return {
+                    ...message,
+                    content: !isTranslationEnabled ?
+                        (message.translatedContent || message.originalContent) :
+                        message.originalContent
+                };
+            }
+            return message;
+        }));
+    };
+
     return (
         <>
-            <style jsx>{`
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-
-                .chat-container {
-                    display: flex;
-                    flex-direction: column;
-                    height: 100vh;
-                    max-width: 900px;
-                    margin: 0 auto;
-                    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 245, 255, 0.95) 100%);
-                    backdrop-filter: blur(10px);
-                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                }
-
-                .chat-header {
-                    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                    color: white;
-                    padding: 20px;
-                    text-align: center;
-                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-                }
-
-                .chat-header h1 {
-                    font-size: 24px;
-                    font-weight: 600;
-                    margin: 0;
-                }
-
-                .chat-header .subtitle {
-                    font-size: 14px;
-                    opacity: 0.9;
-                    margin-top: 5px;
-                }
-
-                .chat-messages {
-                    flex: 1;
-                    overflow-y: auto;
-                    padding: 20px;
-                    background: linear-gradient(180deg, #f8f9ff 0%, #e8f0fe 100%);
-                    position: relative;
-                }
-
-                .chat-messages::-webkit-scrollbar {
-                    width: 6px;
-                }
-
-                .chat-messages::-webkit-scrollbar-track {
-                    background: rgba(0, 0, 0, 0.1);
-                    border-radius: 3px;
-                }
-
-                .chat-messages::-webkit-scrollbar-thumb {
-                    background: rgba(0, 0, 0, 0.3);
-                    border-radius: 3px;
-                }
-
-                .message-wrapper {
-                    margin-bottom: 20px;
-                    display: flex;
-                    animation: fadeInUp 0.3s ease-out;
-                }
-
-                .message-wrapper.user {
-                    justify-content: flex-end;
-                }
-
-                .message-wrapper.ai, .message-wrapper.error {
-                    justify-content: flex-start;
-                }
-
-                .message-bubble {
-                    max-width: 70%;
-                    padding: 15px 20px;
-                    border-radius: 20px;
-                    position: relative;
-                    word-wrap: break-word;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                }
-
-                .message-bubble.user {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    border-bottom-right-radius: 5px;
-                }
-
-                .message-bubble.ai {
-                    background: white;
-                    color: #333;
-                    border: 1px solid #e0e0e0;
-                    border-bottom-left-radius: 5px;
-                }
-
-                .message-bubble.error {
-                    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-                    color: white;
-                }
-
-                .message-content {
-                    white-space: pre-wrap;
-                    line-height: 1.5;
-                    margin-bottom: 8px;
-                }
-
-                .message-time {
-                    font-size: 11px;
-                    opacity: 0.7;
-                    display: flex;
-                    align-items: center;
-                    gap: 5px;
-                }
-
-                .streaming-indicator {
-                    display: inline-flex;
-                    gap: 2px;
-                    margin-left: 5px;
-                }
-
-                .streaming-dot {
-                    width: 4px;
-                    height: 4px;
-                    border-radius: 50%;
-                    background: currentColor;
-                    animation: streamingPulse 1.4s infinite ease-in-out;
-                }
-
-                .streaming-dot:nth-child(1) { animation-delay: -0.32s; }
-                .streaming-dot:nth-child(2) { animation-delay: -0.16s; }
-
-                .empty-state {
-                    text-align: center;
-                    color: #888;
-                    margin-top: 100px;
-                }
-
-                .empty-state-icon {
-                    font-size: 48px;
-                    margin-bottom: 20px;
-                    opacity: 0.5;
-                }
-
-                .typing-indicator {
-                    display: flex;
-                    justify-content: flex-start;
-                    margin-bottom: 20px;
-                }
-
-                .typing-bubble {
-                    background: white;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 20px;
-                    border-bottom-left-radius: 5px;
-                    padding: 15px 20px;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                }
-
-                .typing-dots {
-                    display: flex;
-                    gap: 4px;
-                }
-
-                .typing-dot {
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    background: #ccc;
-                    animation: typingBounce 1.4s infinite ease-in-out;
-                }
-
-                .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-                .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-                .typing-dot:nth-child(3) { animation-delay: 0s; }
-
-                .chat-input-container {
-                    background: white;
-                    padding: 20px;
-                    border-top: 1px solid #e0e0e0;
-                    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-                }
-
-                .input-wrapper {
-                    display: flex;
-                    gap: 12px;
-                    align-items: flex-end;
-                }
-
-                .chat-input {
-                    flex: 1;
-                    border: 2px solid #e0e0e0;
-                    border-radius: 25px;
-                    padding: 12px 20px;
-                    font-size: 16px;
-                    resize: none;
-                    outline: none;
-                    transition: all 0.3s ease;
-                    min-height: 50px;
-                    max-height: 120px;
-                    font-family: inherit;
-                }
-
-                .chat-input:focus {
-                    border-color: #667eea;
-                    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-                }
-
-                .chat-input:disabled {
-                    background: #f5f5f5;
-                    cursor: not-allowed;
-                }
-
-                .send-button {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    border: none;
-                    border-radius: 50%;
-                    width: 50px;
-                    height: 50px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.3s ease;
-                    font-size: 18px;
-                    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-                }
-
-                .send-button:hover:not(:disabled) {
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
-                }
-
-                .send-button:disabled {
-                    background: #ccc;
-                    cursor: not-allowed;
-                    transform: none;
-                    box-shadow: none;
-                }
-
-                @keyframes fadeInUp {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-
-                @keyframes streamingPulse {
-                    0%, 80%, 100% {
-                        opacity: 0.3;
-                        transform: scale(0.8);
-                    }
-                    40% {
-                        opacity: 1;
-                        transform: scale(1);
-                    }
-                }
-
-                @keyframes typingBounce {
-                    0%, 80%, 100% {
-                        transform: scale(0);
-                        opacity: 0.5;
-                    }
-                    40% {
-                        transform: scale(1);
-                        opacity: 1;
-                    }
-                }
-
-                @media (max-width: 768px) {
-                    .chat-container {
-                        height: 100vh;
-                        border-radius: 0;
-                    }
-                    
-                    .message-bubble {
-                        max-width: 85%;
-                    }
-                    
-                    .chat-input-container {
-                        padding: 15px;
-                    }
-                }
-            `}</style>
-
             <div className="chat-container">
                 {/* 헤더 */}
                 <div className="chat-header">
-                    <h1>🦙 Llama3 채팅</h1>
-                    <div className="subtitle">AI와 자연스럽게 대화해보세요</div>
+                    <h1>Llama3</h1>
+                    <div className="subtitle">Llama3_8B</div>
+                    <div className="BackButton">
+                        <button onClick={OutRoom}>버튼</button>
+                    </div>
+                    {/* 번역 토글 */}
+                    <div className="translation-toggle">
+                        <span className="translation-toggle-label">🌐 번역</span>
+                        <div
+                            className={`toggle-switch ${isTranslationEnabled ? 'active' : ''}`}
+                            onClick={toggleTranslation}
+                        >
+                            <div className="toggle-slider"></div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* 채팅 메시지 영역 */}
@@ -435,6 +258,9 @@ function ChatWithLlama3() {
                             <div className="empty-state-icon">💬</div>
                             <h3>안녕하세요!</h3>
                             <p>Llama3와 채팅을 시작해보세요.<br />궁금한 것이 있으면 언제든 물어보세요!</p>
+                            <p style={{ marginTop: '10px', fontSize: '14px', opacity: '0.7' }}>
+                                {isTranslationEnabled ? '번역 활성화됨' : '번역 비활성화됨'}
+                            </p>
                         </div>
                     ) : (
                         <>
@@ -465,7 +291,9 @@ function ChatWithLlama3() {
                                             <div className="typing-dot"></div>
                                             <div className="typing-dot"></div>
                                         </div>
-                                        <span>AI가 응답을 생성하고 있습니다...</span>
+                                        <span>
+                                            AI가 응답을 생성하고 있습니다...
+                                        </span>
                                     </div>
                                 </div>
                             )}
@@ -479,7 +307,7 @@ function ChatWithLlama3() {
                         <textarea
                             ref={inputRef}
                             className="chat-input"
-                            placeholder="메시지를 입력하세요... (Enter: 전송, Shift+Enter: 줄바꿈)"
+                            placeholder={`메시지를 입력하세요... (Enter: 전송, Shift+Enter: 줄바꿈)${isTranslationEnabled ? ' - 번역 활성화됨' : ' - 번역 비활성화됨'}`}
                             value={userInput}
                             onChange={(e) => setUserInput(e.target.value)}
                             onKeyPress={handleKeyPress}

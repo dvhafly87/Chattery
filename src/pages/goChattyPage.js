@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getDatabase, ref, push, onChildAdded, onValue, get, onDisconnect, remove, set } from "firebase/database";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 
 function ChatMain() {
   const navigate = useNavigate();
@@ -12,20 +14,57 @@ function ChatMain() {
   const [roomDeleted, setRoomDeleted] = useState(false);
   const [loadedMessageIds, setLoadedMessageIds] = useState(new Set());
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const file = e.target.elements.fileInput?.files?.[0];
+
+    if (!file) {
+      alert("파일이 없습니다!");
+      return;
+    }
+
+    try {
+      const storage = getStorage();
+
+      const storageReference = storageRef(storage, `chat/rooms/${roomId}/files/${Date.now()}_${file.name}`);
+
+      await uploadBytes(storageReference, file);
+
+      const downloadURL = await getDownloadURL(storageReference);
+
+      const db = getDatabase();
+      const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
+
+      const fileMessage = {
+        sender: nickname,
+        fileUrl: downloadURL,
+        fileName: file.name,
+        fileType: file.type,
+        timestamp: Date.now(),
+      };
+
+      await push(messagesRef, fileMessage);
+
+      setactcss(false);
+      e.target.reset();
+    } catch (error) {
+    }
+  };
+
   useEffect(() => {
     const db = getDatabase();
     const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
     const onlineUsersRef = ref(db, `chat/rooms/${roomId}/onlineUsers`);
     const roomRef = ref(db, `chat/rooms/${roomId}`);
 
-    // ✅ 현재 사용자를 onlineUsers에 추가
+    //  현재 사용자를 onlineUsers에 추가
     const userKey = nickname.replace(/[.#$[\]]/g, "_"); // Firebase key 규칙에 맞게 변환
     set(ref(db, `chat/rooms/${roomId}/onlineUsers/${userKey}`), {
       nickname: nickname,
       timestamp: Date.now()
     });
-
-    // ✅ 입장 메시지 푸시 (세션 기반 중복 방지)
+    // 입장 메시지 푸시 (세션 기반 중복 방지)
     const checkAndAddEnterMessage = async () => {
       try {
         // 현재 온라인 사용자 확인
@@ -52,7 +91,7 @@ function ChatMain() {
       }
     };
 
-    // ✅ 입장 메시지 푸시 (간단한 중복 방지)
+    //입장 메시지 푸시 (간단한 중복 방지)
     setTimeout(() => {
       const enterMessage = {
         sender: "SYSTEM",
@@ -62,7 +101,7 @@ function ChatMain() {
       push(messagesRef, enterMessage);
     }, 500); // 0.5초 후 입장 메시지 전송
 
-    // ✅ 기존 메시지 한번 로드
+    // 기존 메시지 한번 로드
     const loadExistingMessages = async () => {
       try {
         const snapshot = await get(messagesRef);
@@ -84,7 +123,7 @@ function ChatMain() {
     // 기존 메시지 먼저 로드
     loadExistingMessages();
 
-    // ✅ 새로운 메시지만 실시간으로 추가
+    //  새로운 메시지만 실시간으로 추가
     const unsubscribeMessages = onChildAdded(messagesRef, (snapshot) => {
       const messageId = snapshot.key;
       const newMessage = { id: messageId, ...snapshot.val() };
@@ -99,7 +138,7 @@ function ChatMain() {
       }
     });
 
-    // ✅ 방 전체 모니터링 - 방이 삭제되면 메인으로 이동
+    //  방 전체 모니터링 - 방이 삭제되면 메인으로 이동
     const unsubscribeRoom = onValue(roomRef, (snapshot) => {
       if (!snapshot.exists() && !roomDeleted) {
         // 방이 삭제되었고, 자신이 삭제한 것이 아니라면
@@ -109,13 +148,14 @@ function ChatMain() {
       }
     });
 
-    // ✅ 연결이 끊어지면 해당 사용자를 onlineUsers에서 제거
+    //  연결이 끊어지면 해당 사용자를 onlineUsers에서 제거
     onDisconnect(ref(db, `chat/rooms/${roomId}/users/${userKey}`)).remove();
 
-    // ✅ 브라우저 종료/새로고침 시에도 정리
+    //  브라우저 종료/새로고침 시에도 정리
     const handleBeforeUnload = () => {
-      remove(ref(db, `chat`));
+      remove(ref(db, `chat/rooms/${roomId}`));
     };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
@@ -129,6 +169,12 @@ function ChatMain() {
       remove(ref(db, `onlineUsers/${userKey}`));
     };
   }, [roomId, nickname, navigate, roomDeleted]);
+
+  const [actcss, setactcss] = useState(false);
+
+  const imagesender = async () => {
+    setactcss(!actcss);
+  }
 
   //세션 종료 - 개선된 버전
   const OutRoom = async () => {
@@ -211,9 +257,21 @@ function ChatMain() {
           padding: "10px"
         }}
       >
-        {messages.map((msg, idx) => (
-          <div key={msg.id || idx} style={{ marginBottom: "5px" }}>
-            <strong>{msg.sender}:</strong> {msg.text}
+        {messages.map((msg) => (
+          <div key={msg.id} style={{ marginBottom: "5px" }}>
+            <strong>{msg.sender}:</strong> &nbsp;
+            {msg.text && <span>{msg.text}</span>}
+            {msg.fileUrl && (
+              msg.fileType.startsWith("image/") ? (
+                <div>
+                  <img src={msg.fileUrl} alt={msg.fileName} style={{ maxWidth: 200, marginTop: 5, borderRadius: 4 }} />
+                </div>
+              ) : (
+                <div>
+                  <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">📎 {msg.fileName}</a>
+                </div>
+              )
+            )}
           </div>
         ))}
       </div>
@@ -229,10 +287,27 @@ function ChatMain() {
           }}
           style={{ width: "70%", marginRight: "10px" }}
         />
+        <input className="ImageAddedButton" placeholder="📎" type="text" onClick={imagesender} />&nbsp;
         <button className="chatMessageButton" onClick={handleSend}>입력</button>
         <button className="Chat-Exit-Button" onClick={OutRoom}>채팅 종료</button>
       </div>
-    </div>
+      <AnimatePresence>
+        {actcss && (
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{ overflow: "hidden" }}
+          >
+            <input type="file" name="fileInput" />
+            <button type="submit">전송</button>
+          </motion.form>
+        )}
+
+      </AnimatePresence>
+    </div >
   );
 }
 
