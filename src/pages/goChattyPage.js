@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDatabase, ref, push, onChildAdded, onValue, get, onDisconnect, remove, set } from "firebase/database";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,8 +15,9 @@ function ChatMain() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    const formData = new FormData();
     const file = e.target.elements.fileInput?.files?.[0];
+    formData.append('fileInput', file);
 
     if (!file) {
       alert("파일이 없습니다!");
@@ -25,31 +25,18 @@ function ChatMain() {
     }
 
     try {
-      const storage = getStorage();
-
-      const storageReference = storageRef(storage, `chat/rooms/${roomId}/files/${Date.now()}_${file.name}`);
-
-      await uploadBytes(storageReference, file);
-
-      const downloadURL = await getDownloadURL(storageReference);
-
-      const db = getDatabase();
-      const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
-
-      const fileMessage = {
-        sender: nickname,
-        fileUrl: downloadURL,
-        fileName: file.name,
-        fileType: file.type,
-        timestamp: Date.now(),
-      };
-
-      await push(messagesRef, fileMessage);
-
-      setactcss(false);
-      e.target.reset();
+      const responseFU = await fetch('http://122.32.218.57:8787/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const rest = await responseFU.json();
+      alert(rest.message);
     } catch (error) {
+      console.log(error);
     }
+
+    alert(`파일명: ${file.name}`);
+
   };
 
   useEffect(() => {
@@ -64,6 +51,7 @@ function ChatMain() {
       nickname: nickname,
       timestamp: Date.now()
     });
+
     // 입장 메시지 푸시 (세션 기반 중복 방지)
     const checkAndAddEnterMessage = async () => {
       try {
@@ -294,7 +282,9 @@ function ChatMain() {
       <AnimatePresence>
         {actcss && (
           <motion.form
+            id="file-sender"
             onSubmit={handleSubmit}
+            encType="multipart/form-data"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
