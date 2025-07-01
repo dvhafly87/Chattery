@@ -12,31 +12,73 @@ function ChatMain() {
   const [messages, setMessages] = useState([]);
   const [roomDeleted, setRoomDeleted] = useState(false);
   const [loadedMessageIds, setLoadedMessageIds] = useState(new Set());
+  const [isUploading, setIsUploading] = useState(false); // 업로드 상태 추가
 
+  // 파일 업로드 및 메시지 전송
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData();
     const file = e.target.elements.fileInput?.files?.[0];
-    formData.append('fileInput', file);
 
     if (!file) {
       alert("파일이 없습니다!");
       return;
     }
 
+    // 상대방이 연결되어 있는지 확인
+    const db = getDatabase();
+    const onlineUsersRef = ref(db, `chat/rooms/${roomId}/users`);
+
     try {
-      const responseFU = await fetch('http://122.32.218.57:8787/upload', {
+      const snapshot = await get(onlineUsersRef);
+      const users = snapshot.val();
+      const userCount = users ? Object.keys(users).length : 0;
+
+      if (userCount < 2) {
+        alert("아직 상대가 연결되지 않았습니다. 기다려 주세요!");
+        return;
+      }
+
+      setIsUploading(true);
+      formData.append('fileInput', file);
+
+      // 파일을 서버에 업로드
+      const responseFU = await fetch('http://122.32.218.57:8788/upload', {
         method: 'POST',
         body: formData
       });
-      const rest = await responseFU.json();
-      alert(rest.message);
+
+      const result = await responseFU.json();
+
+      if (result.filename) {
+        // 업로드 성공 시 채팅 메시지로 파일 정보 전송
+        const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
+        const fileMessage = {
+          sender: nickname,
+          text: "", // 텍스트는 비워둠
+          fileName: result.filename,
+          fileUrl: result.fileUrl || result.filename, // 서버에서 파일 URL 제공
+          fileType: file.type,
+          fileSize: file.size,
+          timestamp: Date.now(),
+        };
+
+        await push(messagesRef, fileMessage);
+
+        // 파일 전송 완료 후 폼 초기화 및 UI 닫기
+        e.target.reset();
+        setactcss(false);
+
+        alert(`파일 "${result.filename}"이 전송되었습니다.`);
+      } else {
+        alert("파일 업로드에 실패했습니다.");
+      }
     } catch (error) {
-      console.log(error);
+      console.error("파일 전송 실패:", error);
+      alert("파일 전송 중 오류가 발생했습니다.");
+    } finally {
+      setIsUploading(false);
     }
-
-    alert(`파일명: ${file.name}`);
-
   };
 
   useEffect(() => {
@@ -71,8 +113,6 @@ function ChatMain() {
           };
           await push(messagesRef, enterMessage);
         }
-
-
 
       } catch (error) {
         console.error("입장 메시지 처리 실패:", error);
@@ -234,6 +274,15 @@ function ChatMain() {
     }
   };
 
+  // 파일 크기를 읽기 쉽게 포맷하는 함수
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
     <div className="Chat-Main-Container">
       <div
@@ -246,19 +295,50 @@ function ChatMain() {
         }}
       >
         {messages.map((msg) => (
-          <div key={msg.id} style={{ marginBottom: "5px" }}>
+          <div key={msg.id} style={{ marginBottom: "10px" }}>
             <strong>{msg.sender}:</strong> &nbsp;
             {msg.text && <span>{msg.text}</span>}
             {msg.fileUrl && (
-              msg.fileType.startsWith("image/") ? (
-                <div>
-                  <img src={msg.fileUrl} alt={msg.fileName} style={{ maxWidth: 200, marginTop: 5, borderRadius: 4 }} />
-                </div>
-              ) : (
-                <div>
-                  <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">📎 {msg.fileName}</a>
-                </div>
-              )
+              <div style={{ marginTop: "5px" }}>
+                {msg.fileType && msg.fileType.startsWith("image/") ? (
+                  <div>
+                    <img
+                      src={msg.fileUrl}
+                      alt={msg.fileName}
+                      style={{
+                        maxWidth: 200,
+                        maxHeight: 200,
+                        borderRadius: 4,
+                        cursor: "pointer"
+                      }}
+                      onClick={() => window.open(msg.fileUrl, '_blank')}
+                    />
+                    <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
+                      {msg.fileName} ({msg.fileSize ? formatFileSize(msg.fileSize) : 'Unknown size'})
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: "8px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    backgroundColor: "#f9f9f9",
+                    display: "inline-block"
+                  }}>
+                    <a
+                      href={msg.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: "none" }}
+                    >
+                      📎 {msg.fileName}
+                    </a>
+                    <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
+                      {msg.fileSize ? formatFileSize(msg.fileSize) : 'Unknown size'}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         ))}
@@ -275,7 +355,13 @@ function ChatMain() {
           }}
           style={{ width: "70%", marginRight: "10px" }}
         />
-        <input className="ImageAddedButton" placeholder="📎" type="text" onClick={imagesender} />&nbsp;
+        <input
+          className="ImageAddedButton"
+          placeholder="📎"
+          type="button"
+          onClick={imagesender}
+          disabled={isUploading}
+        />&nbsp;
         <button className="chatMessageButton" onClick={handleSend}>입력</button>
         <button className="Chat-Exit-Button" onClick={OutRoom}>채팅 종료</button>
       </div>
@@ -289,15 +375,21 @@ function ChatMain() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            style={{ overflow: "hidden" }}
+            style={{ overflow: "hidden", padding: "10px", border: "1px solid #ccc", marginTop: "5px" }}
           >
-            <input type="file" name="fileInput" />
-            <button type="submit">전송</button>
+            <div>
+              <input type="file" name="fileInput" required />
+              <button type="submit" disabled={isUploading}>
+                {isUploading ? "전송 중..." : "전송"}
+              </button>
+              <button type="button" onClick={() => setactcss(false)} style={{ marginLeft: "5px" }}>
+                취소
+              </button>
+            </div>
           </motion.form>
         )}
-
       </AnimatePresence>
-    </div >
+    </div>
   );
 }
 
