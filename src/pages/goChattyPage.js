@@ -5,6 +5,15 @@ import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 function ChatMain() {
+  window.onpopstate = function (event) {
+    if (window.confirm("나가시겠습니까?")) {
+      const db = getDatabase();
+      const waitingsRoomRef = ref(db, `waitingRooms/${roomId}/`);
+      const MainRoom = ref(db, `chat/rooms/${roomId}/`);
+      remove(waitingsRoomRef);
+      remove(MainRoom);
+    }
+  };
   const navigate = useNavigate();
   const location = useLocation();
   const { nickname = "익명", roomId = "default_room" } = location.state || {};
@@ -212,7 +221,7 @@ function ChatMain() {
       const db = getDatabase();
       const messagesRef = ref(db, `chat/rooms/${roomId}/messages`);
       const roomRef = ref(db, `chat/rooms/${roomId}`);
-      remove(ref(db, `onlineUsers`));
+      const WaitingsRoomRef = ref(db, `waitingRooms/${roomId}`);
 
       try {
         // 퇴장 메시지 먼저 전송
@@ -228,6 +237,7 @@ function ChatMain() {
         setTimeout(async () => {
           try {
             await remove(roomRef);
+            await remove(WaitingsRoomRef);
             console.log("채팅방이 삭제되었습니다.");
             navigate("/Chattery");
           } catch (error) {
